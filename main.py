@@ -1,3 +1,5 @@
+import json
+
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 
@@ -89,18 +91,20 @@ html = """
     <script>
         var ws = new WebSocket("ws://localhost:8000/ws");
         ws.onmessage = function (event) {
+            var json = JSON.parse(event.data)
             var messages = document.getElementById('messages')
             var messagebox = document.createElement('div')
             messagebox.classList.add('message')
             var messagetext = document.createElement('span')
-            var content = document.createTextNode(event.data)
+            var content = document.createTextNode(json['id'] + ":" + json['response'])
             messagetext.appendChild(content)
             messagebox.appendChild(messagetext)
             messages.appendChild(messagebox)
         };
         function sendMessage(event) {
             var input = document.getElementById("messageText")
-            ws.send(input.value)
+            message = JSON.stringify({text: input.value})
+            ws.send(message)
             input.value = ''
             event.preventDefault()
         }
@@ -120,8 +124,12 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     counter = 0
     while True:
-        data = await websocket.receive_text()
-        if data == "":
+        data = await websocket.receive_json()
+        if data['text'] == "":
             continue
         counter = counter + 1
-        await websocket.send_text(f"{counter}: {data}")
+        response ={
+            'id': counter,
+            'response': data['text']
+        }
+        await websocket.send_json(response)
